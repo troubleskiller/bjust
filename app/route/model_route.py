@@ -10,9 +10,9 @@ from app.service.model_upload_service import ModelUploadService
 from app.service.model_service import ModelService
 from app.utils.response import ServerResponse
 
-bp = Blueprint('model', __name__)
+model_bp = Blueprint('model', __name__)
 
-@bp.route('/upload', methods=['POST'])
+@model_bp.route('/upload', methods=['POST'])
 def upload_model():
     """
     处理模型上传
@@ -52,7 +52,7 @@ def upload_model():
             ServerResponse.error(f"模型上传失败：{str(e)}", HTTPStatus.INTERNAL_SERVER_ERROR.value).model_dump()
         ), HTTPStatus.INTERNAL_SERVER_ERROR.value
 
-@bp.route('/list', methods=['GET'])
+@model_bp.route('/list', methods=['GET'])
 def get_model_list():
     """
     获取模型列表（分页）
@@ -91,7 +91,7 @@ def get_model_list():
             ServerResponse.error(f"获取模型列表失败：{str(e)}", HTTPStatus.INTERNAL_SERVER_ERROR.value).model_dump()
         ), HTTPStatus.INTERNAL_SERVER_ERROR.value
 
-@bp.route('/<model_uuid>', methods=['GET'])
+@model_bp.route('/<model_uuid>', methods=['GET'])
 def get_model_detail(model_uuid):
     """
     获取指定模型的详细信息
@@ -112,7 +112,7 @@ def get_model_detail(model_uuid):
             ServerResponse.error(f"获取模型详情失败：{str(e)}", HTTPStatus.INTERNAL_SERVER_ERROR.value).model_dump()
         ), HTTPStatus.INTERNAL_SERVER_ERROR.value
 
-@bp.route('/<model_uuid>', methods=['DELETE'])
+@model_bp.route('/<model_uuid>', methods=['DELETE'])
 def delete_model(model_uuid):
     """
     删除指定模型

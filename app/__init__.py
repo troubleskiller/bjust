@@ -17,6 +17,8 @@ from app.route.online_deduction_route import online_deduction_bp
 from app.route.model_plaza_route import model_plaza_bp
 from app.route.channel_dataset_route import channel_dataset_bp
 from app.route.model_validation_route import model_validation_bp
+from app.route.dataset_route import dataset_bp
+from app.route.model_route import model_bp
 
 def create_app():
     """
@@ -35,11 +37,12 @@ def create_app():
     
     # 注册蓝图
     from app.route import model_route, storage_route, dataset_route, dev_route, evaluate_route
-    app.register_blueprint(model_route.bp, url_prefix='/api/model')
     app.register_blueprint(storage_route.bp)
     app.register_blueprint(dev_route.bp, url_prefix='/dev')
     app.register_blueprint(evaluate_route.bp, url_prefix='/api/evaluate')
     app.register_blueprint(homepage_bp)
+    app.register_blueprint(dataset_bp)
+    app.register_blueprint(model_bp,url_prefix='/api/model')
     app.register_blueprint(online_deduction_bp)
     app.register_blueprint(model_plaza_bp)
     app.register_blueprint(channel_dataset_bp)

@@ -10,9 +10,9 @@ from app.service.dataset_upload_service import DatasetUploadService
 from app.service.dataset_service import DatasetService
 from app.utils.response import ServerResponse
 
-bp = Blueprint('dataset', __name__)
+dataset_bp = Blueprint('dataset', __name__)
 
-@bp.route('/upload', methods=['POST'])
+@dataset_bp.route('/upload', methods=['POST'])
 def upload_dataset():
     """
     处理数据集上传
@@ -52,7 +52,7 @@ def upload_dataset():
             ServerResponse.error(f"数据集上传失败：{str(e)}", HTTPStatus.INTERNAL_SERVER_ERROR.value).model_dump()
         ), HTTPStatus.INTERNAL_SERVER_ERROR.value
 
-@bp.route('/list', methods=['GET'])
+@dataset_bp.route('/list', methods=['GET'])
 def get_dataset_list():
     """
     获取数据集列表（分页）
@@ -91,7 +91,7 @@ def get_dataset_list():
             ServerResponse.error(f"获取数据集列表失败：{str(e)}", HTTPStatus.INTERNAL_SERVER_ERROR.value).model_dump()
         ), HTTPStatus.INTERNAL_SERVER_ERROR.value
 
-@bp.route('/<dataset_uuid>', methods=['GET'])
+@dataset_bp.route('/<dataset_uuid>', methods=['GET'])
 def get_dataset_detail(dataset_uuid):
     """
     获取指定数据集的详细信息
@@ -112,7 +112,7 @@ def get_dataset_detail(dataset_uuid):
             ServerResponse.error(f"获取数据集详情失败：{str(e)}", HTTPStatus.INTERNAL_SERVER_ERROR.value).model_dump()
         ), HTTPStatus.INTERNAL_SERVER_ERROR.value
 
-@bp.route('/<dataset_uuid>', methods=['DELETE'])
+@dataset_bp.route('/<dataset_uuid>', methods=['DELETE'])
 def delete_dataset(dataset_uuid):
     """
     删除指定数据集
