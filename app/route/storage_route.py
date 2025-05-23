@@ -18,7 +18,7 @@ def serve_storage(filename):
         storage_path = current_app.config['STORAGE_FOLDER']
         
         # 检查请求的文件是否在允许的目录中
-        if not (filename.startswith('model/') or filename.startswith('dataset/') or filename.startswith('evaluate/') or filename.startswith('image/')):
+        if not (filename.startswith('model/') or filename.startswith('dataset/') or filename.startswith('evaluate/') or filename.startswith('best_cases/')):
             abort(403)  # 禁止访问非模型文件目录
             
         # 获取文件所在目录和文件名
