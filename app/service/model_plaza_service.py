@@ -5,6 +5,11 @@ import math
 from app.model.homepage_models import BestPracticeCase
 from flask import current_app # For accessing app config for storage paths
 import os
+import uuid
+import json
+from typing import Dict, Any, Optional, Tuple, List
+from datetime import datetime
+from werkzeug.datastructures import FileStorage
 
 def get_models_plaza_service(page=1, page_size=10, model_name_search=None, 
                            model_type=None, frequency_bands_str=None, 
@@ -75,7 +80,210 @@ def get_models_plaza_service(page=1, page_size=10, model_name_search=None,
 
     except Exception as e:
         # current_app.logger.error(f"Error in get_models_plaza_service: {str(e)}")
-        return None, None, str(e) 
+        return None, None, str(e)
+
+def get_model_details_service(model_uuid: str) -> Tuple[Optional[Dict], Optional[str]]:
+    """
+    获取指定模型的详细信息，用于编辑表单填充
+    
+    Args:
+        model_uuid: 模型UUID
+    
+    Returns:
+        (model_details, error_message)
+    """
+    try:
+        model = Model.query.filter(Model.model_uuid == model_uuid).first()
+        if not model:
+            return None, "Model not found."
+
+        model_details = {
+            "model_uuid": model.model_uuid,
+            "model_name": model.model_name,
+            "model_type": model.model_type,
+            "frequency_bands": model.frequency_bands if isinstance(model.frequency_bands, list) else [],
+            "application_scenarios": model.application_scenarios if isinstance(model.application_scenarios, list) else [],
+            "model_description": model.model_description,
+            "model_doc_filename": os.path.basename(model.model_doc_storage_path) if model.model_doc_storage_path else None,
+            "tiff_image_filename": os.path.basename(model.tiff_image_storage_path) if model.tiff_image_storage_path else None,
+            "dataset_for_validation_filename": os.path.basename(model.dataset_for_validation_storage_path) if model.dataset_for_validation_storage_path else None,
+            "update_time": model.updated_at.isoformat() + "Z"
+        }
+        
+        return model_details, None
+
+    except Exception as e:
+        current_app.logger.error(f"Error in get_model_details_service for {model_uuid}: {str(e)}")
+        return None, str(e)
+
+def import_model_service(form_data: Dict[str, Any], model_file: FileStorage, 
+                        validation_file: Optional[FileStorage] = None) -> Tuple[Optional[Dict], Optional[str]]:
+    """
+    导入/创建新模型
+    
+    Args:
+        form_data: 表单数据
+        model_file: 模型ZIP文件
+        validation_file: 可选的验证数据集文件
+    
+    Returns:
+        (result, error_message)
+    """
+    try:
+        # 验证必需字段
+        required_fields = ['model_name', 'model_type', 'frequency_bands', 'application_scenarios', 'model_description']
+        for field in required_fields:
+            if field not in form_data or not form_data[field]:
+                return None, f"Missing required field: {field}"
+
+        # 解析JSON字符串
+        try:
+            frequency_bands = json.loads(form_data['frequency_bands'])
+            application_scenarios = json.loads(form_data['application_scenarios'])
+        except json.JSONDecodeError:
+            return None, "Invalid JSON format for frequency_bands or application_scenarios"
+
+        # 生成模型UUID
+        model_uuid = str(uuid.uuid4())
+
+        # TODO: 这里应该处理文件存储
+        # 1. 创建模型存储目录
+        # 2. 解压ZIP文件
+        # 3. 提取模型文件、文档、图像等
+        # 4. 存储到指定位置
+        
+        # 创建模型记录
+        new_model = Model(
+            model_uuid=model_uuid,
+            model_name=form_data['model_name'],
+            model_type=form_data['model_type'],
+            frequency_bands=frequency_bands,
+            application_scenarios=application_scenarios,
+            model_description=form_data['model_description'],
+            # 以下路径在实际实现中应该基于文件处理结果
+            model_storage_path=f"models/{model_uuid}/model.zip",
+            model_doc_storage_path=f"models/{model_uuid}/doc.md",
+            tiff_image_storage_path=f"models/{model_uuid}/image.tiff" if validation_file else None,
+            dataset_for_validation_storage_path=f"models/{model_uuid}/validation.zip" if validation_file else None,
+            can_be_used_for_validation=validation_file is not None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+
+        db.session.add(new_model)
+        db.session.commit()
+
+        result = {
+            "model_uuid": model_uuid,
+            "model_name": form_data['model_name']
+        }
+
+        return result, None
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error in import_model_service: {str(e)}")
+        return None, f"Failed to import model: {str(e)}"
+
+def update_model_service(model_uuid: str, update_data: Dict[str, Any], 
+                        model_file: Optional[FileStorage] = None,
+                        validation_file: Optional[FileStorage] = None) -> Tuple[Optional[Dict], Optional[str]]:
+    """
+    更新模型信息
+    
+    Args:
+        model_uuid: 模型UUID
+        update_data: 更新数据
+        model_file: 可选的新模型文件
+        validation_file: 可选的新验证数据集文件
+    
+    Returns:
+        (result, error_message)
+    """
+    try:
+        model = Model.query.filter(Model.model_uuid == model_uuid).first()
+        if not model:
+            return None, "Model not found."
+
+        # 更新基本信息
+        if 'model_name' in update_data and update_data['model_name'] is not None:
+            model.model_name = update_data['model_name']
+            
+        if 'model_type' in update_data and update_data['model_type'] is not None:
+            model.model_type = update_data['model_type']
+            
+        if 'model_description' in update_data and update_data['model_description'] is not None:
+            model.model_description = update_data['model_description']
+
+        # 处理JSON字段
+        if 'frequency_bands' in update_data and update_data['frequency_bands'] is not None:
+            if isinstance(update_data['frequency_bands'], str):
+                try:
+                    model.frequency_bands = json.loads(update_data['frequency_bands'])
+                except json.JSONDecodeError:
+                    return None, "Invalid JSON format for frequency_bands"
+            else:
+                model.frequency_bands = update_data['frequency_bands']
+
+        if 'application_scenarios' in update_data and update_data['application_scenarios'] is not None:
+            if isinstance(update_data['application_scenarios'], str):
+                try:
+                    model.application_scenarios = json.loads(update_data['application_scenarios'])
+                except json.JSONDecodeError:
+                    return None, "Invalid JSON format for application_scenarios"
+            else:
+                model.application_scenarios = update_data['application_scenarios']
+
+        # TODO: 处理文件更新
+        # if model_file:
+        #     # 处理新的模型文件
+        #     pass
+        # if validation_file:
+        #     # 处理新的验证数据集文件
+        #     model.can_be_used_for_validation = True
+
+        model.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        result = {"model_uuid": model_uuid}
+        return result, None
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error in update_model_service for {model_uuid}: {str(e)}")
+        return None, f"Failed to update model: {str(e)}"
+
+def delete_model_service(model_uuid: str) -> Tuple[bool, Optional[str]]:
+    """
+    删除模型
+    
+    Args:
+        model_uuid: 模型UUID
+    
+    Returns:
+        (success, error_message)
+    """
+    try:
+        model = Model.query.filter(Model.model_uuid == model_uuid).first()
+        if not model:
+            return False, "Model not found."
+
+        # TODO: 删除关联的文件
+        # if model.model_storage_path:
+        #     # 删除模型文件
+        # if model.model_doc_storage_path:
+        #     # 删除文档文件
+        # 等等...
+
+        db.session.delete(model)
+        db.session.commit()
+
+        return True, None
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error in delete_model_service for {model_uuid}: {str(e)}")
+        return False, f"Failed to delete model: {str(e)}"
 
 def get_grouped_models_service():
     """

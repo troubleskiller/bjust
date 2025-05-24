@@ -101,40 +101,37 @@
 | `model_img`         | string     | "/storage/models/raytracer_pro_thumb.jpg"  | 模型缩略图路径           |
 | `model_doc_url`     | string     | "/models/uuid-model-001/documentation"     | 模型详细文档页面链接     |
 
----
-
-## **在线推演 - 单点预测 (Online Deduction - Single Point Prediction)**
-*(包含单点模式和链路模式)*
-
-### **创建单点预测任务 (Create Single Point Prediction Task)**
-**接口名称**: `createSinglePointPredictionTask()`
+### **创建预测任务 (Create Prediction Task) - 统一接口**
+**接口名称**: `createPredictionTask()`
 **请求方法**: `POST`
-**路径**: `/api/v1/online_deduction/tasks/single_point`
+**路径**: `/api/v1/online_deduction/tasks`
 
-**描述**: 创建单点预测任务（支持单点或链路模式的接收机配置），返回任务ID。
+**描述**: 创建预测任务的统一接口，通过prediction_mode区分不同类型的预测任务（单点预测、链路预测、态势预测、小尺度预测），返回任务ID。
 
 **请求体**:
 ```json
 {
   "model_uuid": "uuid-model-001",
-  "prediction_mode": "point",
+  "prediction_mode": "link",
   "point_config": {
-    "tx_pos": {
-      "lat": 39.915,
-      "lon": 116.404,
-      "height": 30.0
-    },
+    "tx_pos_list": [
+      { "lat": 39.915, "lon": 116.404, "height": 30.0 }
+    ],
     "rx_pos_list": [
       { "lat": 39.916, "lon": 116.405, "height": 1.5 },
-      { "lat": 39.917, "lon": 116.406, "height": 1.5 }
+      { "lat": 39.917, "lon": 116.406, "height": 1.5 },
+      { "lat": 39.918, "lon": 116.407, "height": 1.5 }
     ],
-    "rx_path": {
-      "start_pos": { "lat": 39.916, "lon": 116.405, "height": 1.5 },
-      "end_pos": { "lat": 39.920, "lon": 116.410, "height": 1.5 }
-    }
+    "area_bounds": {
+      "min_lat": 39.900, "min_lon": 116.390,
+      "max_lat": 39.930, "max_lon": 116.420
+    },
+    "resolution_m": 10
   },
   "param_config": {
-    "frequency_band": "5.9GHz"
+    "frequency_band": "5.9GHz",
+    "modulation_mode": "QPSK",
+    "modulation_order": 4
   }
 }
 ```
@@ -143,23 +140,30 @@
 | 字段名              | 类型       | 示例                          | 备注                                  |
 |---------------------|------------|-------------------------------|---------------------------------------|
 | `model_uuid`        | string     | "uuid-model-001"              | 所选模型唯一标识                      |
-| `prediction_mode`   | string     | "point" / "link"              | 预测模式 ("point" 或 "link")          |
+| `prediction_mode`   | string     | "point" / "link" / "situation" / "small_scale" | 预测模式：<br/>- "point": 单点预测<br/>- "link": 链路预测<br/>- "situation": 态势预测<br/>- "small_scale": 小尺度预测 |
 | `point_config`      | object     | 见下                             | 点位配置                              |
 | `param_config`      | object     | 见下                             | 参数配置                              |
 
 #### **`point_config` 字段说明**:
 | 字段名          | 类型   | 示例                                                                 | 备注                                    |
 |-----------------|--------|----------------------------------------------------------------------|-----------------------------------------|
-| `tx_pos`        | object | `{ "lat": 39.915, "lon": 116.404, "height": 30.0 }`                  | 发射机位置 (纬度, 经度, 海拔高度米)     |
-| `rx_pos_list`   | array  | `[{ "lat": ..., "lon": ..., "height": ... }, ...]` (可选)             | 接收机点列表 (prediction_mode="point", 最多20个点)  |
-| `rx_path`       | object | `{ "start_pos": {...}, "end_pos": {...} }` (可选)                      | 接收机路径 (prediction_mode="link")     |
-| `rx_path.start_pos`| object | `{ "lat": ..., "lon": ..., "height": ... }`                          | 路径起点                                |
-| `rx_path.end_pos`  | object | `{ "lat": ..., "lon": ..., "height": ... }`                          | 路径终点                                |
+| `tx_pos_list`   | array  | `[{ "lat": 39.915, "lon": 116.404, "height": 30.0 }, ...]`          | 发射机位置列表 (纬度, 经度, 海拔高度米) |
+| `rx_pos_list`   | array  | `[{ "lat": ..., "lon": ..., "height": ... }, ...]`                  | 接收机点列表 (用于 prediction_mode="point" 和 "link") |
+| `area_bounds`   | object | `{ "min_lat": ..., "min_lon": ..., "max_lat": ..., "max_lon": ... }` | (可选) 预测区域边界 (用于 prediction_mode="situation") |
+| `resolution_m`  | float  | 10                                                                   | (可选) 热力图空间分辨率 (米) (用于 prediction_mode="situation") |
+
+**使用说明**:
+- **prediction_mode="point"**: 单点预测模式，使用 `tx_pos_list` 和 `rx_pos_list` 定义离散的发射-接收点对
+- **prediction_mode="link"**: 链路预测模式，使用 `tx_pos_list` 和 `rx_pos_list` 定义发射机和接收路径点序列  
+- **prediction_mode="situation"**: 态势预测模式，使用 `tx_pos_list` 定义发射机，可选 `area_bounds` 和 `resolution_m` 定义预测区域
+- **prediction_mode="small_scale"**: 小尺度预测模式，使用 `tx_pos_list` 和 `rx_pos_list`，需要额外的调制参数
 
 #### **`param_config` 字段说明**:
 | 字段名           | 类型   | 示例       | 备注         |
 |------------------|--------|------------|--------------|
 | `frequency_band` | string | "5.9GHz"   | 频段 (e.g., "2.4GHz", "5.9GHz", "28GHz") |
+| `modulation_mode`| string | "QPSK"     | (可选) 调制方式，用于 prediction_mode="small_scale" (e.g., "BPSK", "QPSK", "16QAM", "64QAM") |
+| `modulation_order`| int   | 4          | (可选) 调制阶数，用于 prediction_mode="small_scale" (e.g., 2, 4, 16, 64) |
 
 **响应结构**:
 ```json
@@ -167,22 +171,28 @@
   "message": "success",
   "code": "200",
   "data": {
-    "task_uuid": "spp-task-uuid-001"
+    "task_uuid": "pred-task-uuid-001",
+    "prediction_mode": "link"
   }
 }
 ```
 
+---
+
+## **在线推演 - 单点预测 (Online Deduction - Single Point Prediction)**
+*(包含单点模式和链路模式)*
+
 ### **获取单点预测任务结果 (Get Single Point Prediction Task Result)**
 **接口名称**: `getSinglePointPredictionTaskResult()`
 **请求方法**: `GET`
-**路径**: `/api/v1/online_deduction/tasks/single_point/{task_uuid}/results`
+**路径**: `/api/v1/online_deduction/tasks/{task_uuid}/results`
 
 **描述**: 增量获取单点预测任务的结果。结果格式适应单点或链路模式。
 
 **请求参数 (路径)**:
 | 参数名        | 类型   | 示例                | 备注                   |
 |---------------|--------|---------------------|------------------------|
-| `task_uuid`   | string | "spp-task-uuid-001" | 任务唯一标识 (路径参数) |
+| `task_uuid`   | string | "pred-task-uuid-001" | 任务唯一标识 (路径参数) |
 
 **请求参数 (Query)**:
 | 参数名        | 类型   | 示例                | 备注                                      |
@@ -197,7 +207,7 @@
   "message": "success",
   "code": "200",
   "data": {
-    "task_uuid": "spp-task-uuid-001",
+    "task_uuid": "pred-task-uuid-001",
     "status": "IN_PROGRESS",
     "prediction_mode": "point",
     "total_points": 5,
@@ -224,7 +234,7 @@
   "message": "success",
   "code": "200",
   "data": {
-    "task_uuid": "spp-task-uuid-001",
+    "task_uuid": "pred-task-uuid-001",
     "status": "COMPLETED",
     "prediction_mode": "link",
     "total_samples": 100,
@@ -251,7 +261,7 @@
 **通用结果字段说明**:
 | 字段名                 | 类型   | 示例                  | 备注                                      |
 |------------------------|--------|-----------------------|-------------------------------------------|
-| `task_uuid`            | string | "spp-task-uuid-001"   | 任务唯一标识                              |
+| `task_uuid`            | string | "pred-task-uuid-001"   | 任务唯一标识                              |
 | `status`               | string | "IN_PROGRESS"         | 任务状态 ("PENDING", "IN_PROGRESS", "COMPLETED", "FAILED") |
 | `prediction_mode`      | string | "point" / "link"      | 预测模式                                  |
 | `total_points`         | int    | 5                     | (point mode) 总Rx点数                     |
@@ -280,76 +290,17 @@
 
 ## **在线推演 - 态势预测 (Online Deduction - Situation Prediction)**
 
-### **创建态势预测任务 (Create Situation Prediction Task)**
-**接口名称**: `createSituationPredictionTask()`
-**请求方法**: `POST`
-**路径**: `/api/v1/online_deduction/tasks/situation`
-
-**描述**: 创建态势预测任务，用于生成区域覆盖热力图。
-
-**请求体**:
-```json
-{
-  "model_uuid": "uuid-model-002",
-  "point_config": {
-    "tx_pos_list": [
-      { "lat": 39.915, "lon": 116.404, "height": 30.0 },
-      { "lat": 39.918, "lon": 116.400, "height": 25.0 }
-    ],
-    "area_bounds": {
-        "min_lat": 39.900, "min_lon": 116.390,
-        "max_lat": 39.930, "max_lon": 116.420
-    },
-    "resolution_m": 10
-  },
-  "param_config": {
-    "frequency_band": "2.4GHz"
-  }
-}
-```
-
-**字段说明**:
-| 字段名           | 类型   | 示例                                                               | 备注                                      |
-|------------------|--------|--------------------------------------------------------------------|-------------------------------------------|
-| `model_uuid`     | string | "uuid-model-002"                                                   | 所选模型唯一标识                          |
-| `point_config`   | object | 见下                                                                 | 点位和区域配置                            |
-| `param_config`   | object | `{ "frequency_band": "2.4GHz" }`                                     | 参数配置                                  |
-
-#### **`point_config` 字段说明**:
-| 字段名           | 类型   | 示例                                                                | 备注                                |
-|------------------|--------|---------------------------------------------------------------------|-------------------------------------|
-| `tx_pos_list`    | array  | `[{ "lat": ..., "lon": ..., "height": ... }, ...]`                  | 发射机位置列表 (每个Tx可有独立高度) |
-| `area_bounds`    | object | (可选) `{ "min_lat": ..., "min_lon": ..., "max_lat": ..., "max_lon": ...}` | 预测区域边界 (否则后端根据Tx位置自动确定) |
-| `resolution_m`   | float  | 10                                                                  | (可选) 热力图空间分辨率（米），后端可有默认值 |
-
-#### **`param_config` 字段说明**:
-| 字段名           | 类型   | 示例       | 备注         |
-|------------------|--------|------------|--------------|
-| `frequency_band` | string | "2.4GHz"   | 频段         |
-
-
-**响应结构**:
-```json
-{
-  "message": "success",
-  "code": "200",
-  "data": {
-    "task_uuid": "sit-task-uuid-001"
-  }
-}
-```
-
 ### **获取态势预测任务结果 (Get Situation Prediction Task Result)**
 **接口名称**: `getSituationPredictionTaskResult()`
 **请求方法**: `GET`
-**路径**: `/api/v1/online_deduction/tasks/situation/{task_uuid}/result`
+**路径**: `/api/v1/online_deduction/tasks/{task_uuid}/result`
 
 **描述**: 获取态势预测任务的结果（热力图数据）。通常一次性返回。
 
 **请求参数 (路径)**:
 | 参数名      | 类型   | 示例                | 备注                   |
 |-------------|--------|---------------------|------------------------|
-| `task_uuid` | string | "sit-task-uuid-001" | 任务唯一标识 (路径参数) |
+| `task_uuid` | string | "pred-task-uuid-001" | 任务唯一标识 (路径参数) |
 
 **响应结构**:
 ```json
@@ -357,8 +308,9 @@
   "message": "success",
   "code": "200",
   "data": {
-    "task_uuid": "sit-task-uuid-001",
+    "task_uuid": "pred-task-uuid-001",
     "status": "COMPLETED",
+    "prediction_mode": "situation",
     "result": {
       "heatmap_data_type": "grid",
       "grid_origin": { "lat": 39.900, "lon": 116.390 },
@@ -372,15 +324,16 @@
       "value_unit": "dB"
     }
     // Alternative for large data:
-    // "result_url": "/storage/tasks/sit-task-uuid-001/heatmap.json"
+    // "result_url": "/storage/tasks/pred-task-uuid-001/heatmap.json"
   }
 }
 ```
 **字段说明**:
 | 字段名                | 类型   | 示例                                      | 备注                                                                 |
 |-----------------------|--------|-------------------------------------------|----------------------------------------------------------------------|
-| `task_uuid`           | string | "sit-task-uuid-001"                       | 任务唯一标识                                                         |
+| `task_uuid`           | string | "pred-task-uuid-001"                       | 任务唯一标识                                                         |
 | `status`              | string | "COMPLETED"                               | 任务状态 ("PENDING", "IN_PROGRESS", "COMPLETED", "FAILED")             |
+| `prediction_mode`     | string | "situation"                               | 预测模式                                                             |
 | `result.heatmap_data_type`| string | "grid"                                    | 热力图数据格式 (e.g., "grid" for direct array, "geojson_url" for a file link) |
 | `result.grid_origin`  | object | `{ "lat": ..., "lon": ... }`              | (if type="grid") 网格左下角原点                                      |
 | `result.cell_size_deg`| object | `{ "lat_delta": ..., "lon_delta": ... }`  | (if type="grid") 网格单元大小 (度) 或 `cell_size_m` (米)             |
@@ -394,63 +347,17 @@
 
 ## **在线推演 - 小尺度预测 (Online Deduction - Small Scale Prediction)**
 
-### **创建小尺度预测任务 (Create Small Scale Prediction Task)**
-**接口名称**: `createSmallScalePredictionTask()`
-**请求方法**: `POST`
-**路径**: `/api/v1/online_deduction/tasks/small_scale`
-
-**描述**: 创建小尺度预测任务，通常涉及链路和高级通信参数。
-
-**请求体**:
-```json
-{
-  "model_uuid": "uuid-model-003",
-  "point_config": {
-    "tx_pos": { "lat": 39.915, "lon": 116.404, "height": 30.0 },
-    "rx_path": {
-      "start_pos": { "lat": 39.916, "lon": 116.405, "height": 1.5 },
-      "end_pos": { "lat": 39.920, "lon": 116.410, "height": 1.5 }
-    }
-  },
-  "param_config": {
-    "frequency_band": "28GHz",
-    "modulation_mode": "QPSK",
-    "modulation_order": 4
-  }
-}
-```
-**字段说明**:
-| 字段名                    | 类型   | 示例      | 备注                     |
-|---------------------------|--------|-----------|--------------------------|
-| `model_uuid`              | string | "uuid-model-003" | 所选模型唯一标识         |
-| `point_config`            | object | 见单点预测链路模式 | 点位配置 (包含 `tx_pos` 和 `rx_path`) |
-| `param_config.frequency_band`| string | "28GHz"   | 频段                     |
-| `param_config.modulation_mode`| string | "QPSK"    | 调制方式 (e.g., "BPSK", "QPSK", "16QAM", "64QAM") |
-| `param_config.modulation_order`| int    | 4         | 调制阶数 (e.g., 2, 4, 16, 64) |
-
-
-**响应结构**:
-```json
-{
-  "message": "success",
-  "code": "200",
-  "data": {
-    "task_uuid": "ssp-task-uuid-001"
-  }
-}
-```
-
 ### **获取小尺度预测任务结果 (Get Small Scale Prediction Task Result)**
 **接口名称**: `getSmallScalePredictionTaskResult()`
 **请求方法**: `GET`
-**路径**: `/api/v1/online_deduction/tasks/small_scale/{task_uuid}/result`
+**路径**: `/api/v1/online_deduction/tasks/{task_uuid}/result`
 
 **描述**: 获取小尺度预测任务的结果，包括PDP和BER/SNR数据。通常一次性返回。
 
 **请求参数 (路径)**:
 | 参数名      | 类型   | 示例                | 备注                   |
 |-------------|--------|---------------------|------------------------|
-| `task_uuid` | string | "ssp-task-uuid-001" | 任务唯一标识 (路径参数) |
+| `task_uuid` | string | "pred-task-uuid-001" | 任务唯一标识 (路径参数) |
 
 **响应结构**:
 ```json
@@ -458,8 +365,9 @@
   "message": "success",
   "code": "200",
   "data": {
-    "task_uuid": "ssp-task-uuid-001",
+    "task_uuid": "pred-task-uuid-001",
     "status": "COMPLETED",
+    "prediction_mode": "small_scale",
     "results": {
       "pdp_data": {
         "time_delays_ns": [0, 10, 20, 30, ...],
@@ -467,7 +375,7 @@
           { "pos": {"lat": 39.916, "lon": 116.405, "height": 1.5}, "pdp": [-80, -85, -90, -100, ...] },
           { "pos": {"lat": 39.917, "lon": 116.406, "height": 1.5}, "pdp": [-82, -83, -92, -105, ...] }
         ]
-        // "pdp_data_url": "/storage/tasks/ssp-task-uuid-001/pdp_data.json"
+        // "pdp_data_url": "/storage/tasks/pred-task-uuid-001/pdp_data.json"
       },
       "ber_snr_data": {
         "snr_values_db": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
@@ -475,7 +383,7 @@
           { "pos": {"lat": 39.916, "lon": 116.405, "height": 1.5}, "ber": [0.5, 0.3, 0.1, 0.01, ...] },
           { "pos": {"lat": 39.917, "lon": 116.406, "height": 1.5}, "ber": [0.45, 0.28, 0.08, 0.008, ...] }
         ]
-        // "ber_snr_data_url": "/storage/tasks/ssp-task-uuid-001/ber_snr_data.json"
+        // "ber_snr_data_url": "/storage/tasks/pred-task-uuid-001/ber_snr_data.json"
       }
     }
   }
@@ -484,8 +392,9 @@
 **字段说明**:
 | 字段名                    | 类型   | 示例                                      | 备注                                                                 |
 |---------------------------|--------|-------------------------------------------|----------------------------------------------------------------------|
-| `task_uuid`               | string | "ssp-task-uuid-001"                       | 任务唯一标识                                                         |
+| `task_uuid`               | string | "pred-task-uuid-001"                       | 任务唯一标识                                                         |
 | `status`                  | string | "COMPLETED"                               | 任务状态 ("PENDING", "IN_PROGRESS", "COMPLETED", "FAILED")             |
+| `prediction_mode`         | string | "small_scale"                             | 预测模式                                                             |
 | `results.pdp_data`        | object |                                           | 功率延迟谱 (Power Delay Profile) 数据                                 |
 | `results.pdp_data.time_delays_ns` | array | `[0, 10, 20, ...]`                    | 采样时间延迟 (纳秒)                                                  |
 | `results.pdp_data.power_levels_dbm` | array | `[{pos:{...}, pdp:[-80,...]}, ...]` | 对应每个采样点的PDP数据 (pdp是功率值dBm数组)                       |
@@ -494,7 +403,6 @@
 | `results.ber_snr_data.snr_values_db` | array | `[0, 2, 4, ...]`                     | SNR值列表 (dB)                                                       |
 | `results.ber_snr_data.ber_values` | array | `[{pos:{...}, ber:[0.5,...]}, ...]`    | 对应每个采样点的BER曲线 (ber是误码率数组)                            |
 | `results.ber_snr_data.ber_snr_data_url` | string | (可选)                         | BER/SNR数据文件下载链接 (如果数据复杂)                               |
-
 
 ---
 

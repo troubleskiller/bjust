@@ -36,6 +36,12 @@ class Config:
     EVALUATE_FOLDER = 'evaluate'  # 验证任务资源主目录
     EVALUATE_OUTPUT_FOLDER = 'output'  # 验证任务输出目录
     
+    # 任务CSV文件存储目录
+    TASK_CSV_DIR = os.path.join(STORAGE_FOLDER, 'tasks', 'csv')  # 任务CSV文件存储目录
+    
+    # 模型存储基础路径配置
+    MODEL_STORAGE_BASE_PATH = STORAGE_FOLDER  # 模型文件存储基础路径
+    
     # 日志配置
     LOG_PATH = os.getenv('LOG_PATH', 'logs')  # 日志文件路径，默认为logs目录
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')  # 日志级别

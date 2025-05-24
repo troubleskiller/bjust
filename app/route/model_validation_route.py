@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, current_app, request
-from app.service.model_validation_service import get_validation_task_types_service, get_validation_datasets_service, get_validation_models_service, create_validation_task_service
+from app.service.model_validation_service import get_validation_task_types_service, get_validation_datasets_service, get_validation_models_service, create_validation_task_service, get_validation_task_results_service
 
 model_validation_bp = Blueprint('model_validation_bp', __name__, url_prefix='/api/v1/validation')
 
@@ -285,4 +285,81 @@ def create_validation_task_route():
 
     except Exception as e:
         current_app.logger.error(f"Unexpected error in create_validation_task_route: {str(e)} (Data: {data})")
-        return jsonify({"message": "An unexpected error occurred.", "code": "500"}), 500 
+        return jsonify({"message": "An unexpected error occurred.", "code": "500"}), 500
+
+@model_validation_bp.route('/tasks/<string:validation_task_uuid>', methods=['GET'])
+def get_validation_task_results_route(validation_task_uuid: str):
+    """
+    Get Model Validation Task Status & Results
+    ---
+    tags:
+      - Model Validation
+    parameters:
+      - name: validation_task_uuid
+        in: path
+        required: true
+        description: The UUID of the validation task.
+        schema:
+          type: string
+    responses:
+      200:
+        description: Validation task status and results.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  example: "200"
+                message:
+                  type: string
+                  example: "success"
+                data:
+                  type: object
+                  properties:
+                    validation_task_uuid:
+                      type: string
+                    validation_task_name:
+                      type: string
+                    task_type:
+                      type: string
+                    dataset_name:
+                      type: string
+                    status:
+                      type: string
+                      enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED", "PARTIAL_COMPLETE"]
+                    error_message:
+                      type: string
+                      nullable: true
+                    actual_data:
+                      type: object
+                      description: Structure depends on task_type
+                    model_comparison_results:
+                      type: array
+                      items:
+                        type: object
+                        description: Structure depends on task_type
+      404:
+        description: Validation task not found.
+      500:
+        description: Internal server error.
+    """
+    try:
+        result, error = get_validation_task_results_service(validation_task_uuid)
+
+        if error:
+            if "not found" in error.lower():
+                return jsonify({"message": error, "code": "404", "data": None}), 404
+            
+            current_app.logger.error(f"Error getting validation task results for {validation_task_uuid}: {error}")
+            return jsonify({"message": f"Failed to get validation task results: {error}", "code": "500", "data": None}), 500
+        
+        if not result:
+            return jsonify({"message": "Validation task not found.", "code": "404", "data": None}), 404
+
+        return jsonify({"message": "success", "code": "200", "data": result}), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error in get_validation_task_results_route: {str(e)}")
+        return jsonify({"message": "An unexpected error occurred.", "code": "500", "data": None}), 500 
