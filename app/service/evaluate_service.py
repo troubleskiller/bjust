@@ -204,17 +204,17 @@ class EvaluateService:
             if not isinstance(evaluate_type, int) or evaluate_type < 1 or evaluate_type > 4:
                 raise ValueError("验证任务类型必须是1-4之间的整数")
             
-            # 如果提供了model_uuid，验证其存在性
-            if model_uuid:
-                model = ModelInfo.query.get(model_uuid)
-                if not model:
-                    raise ValueError(f"未找到UUID为 {model_uuid} 的模型")
-            
-            # 如果提供了dataset_uuid，验证其存在性
-            if dataset_uuid:
-                dataset = DatasetInfo.query.get(dataset_uuid)
-                if not dataset:
-                    raise ValueError(f"未找到UUID为 {dataset_uuid} 的数据集")
+            # # 如果提供了model_uuid，验证其存在性
+            # if model_uuid:
+            #     model = ModelInfo.query.get(model_uuid)
+            #     if not model:
+            #         raise ValueError(f"未找到UUID为 {model_uuid} 的模型")
+            #
+            # # 如果提供了dataset_uuid，验证其存在性
+            # if dataset_uuid:
+            #     dataset = DatasetInfo.query.get(dataset_uuid)
+            #     if not dataset:
+            #         raise ValueError(f"未找到UUID为 {dataset_uuid} 的数据集")
             
             # 创建验证任务对象
             evaluate = EvaluateInfo(
@@ -371,29 +371,29 @@ class EvaluateService:
             # 获取验证任务
             evaluate = EvaluateInfo.query.get_or_404(evaluate_uuid)
             
-            # 检查任务状态
-            if evaluate.evaluate_status == EvaluateStatusType.IN_PROGRESS.value:
-                raise ValueError("任务正在进行中，无法重复启动")
-            
-            # 检查模型
-            if not evaluate.model_uuid:
-                raise ValueError("未指定关联的模型")
-            model = ModelInfo.query.get(evaluate.model_uuid)
-            if not model:
-                raise ValueError(f"未找到UUID为 {evaluate.model_uuid} 的模型")
-            model_detail = ModelDetail.query.filter_by(model_uuid=evaluate.model_uuid).first()
-            if not model_detail:
-                raise ValueError(f"未找到模型 {model.name} 的详细信息")
-            
-            # 检查数据集（如果指定了）
-            if evaluate.dataset_uuid:
-                dataset = DatasetInfo.query.get(evaluate.dataset_uuid)
-                if not dataset:
-                    raise ValueError(f"未找到UUID为 {evaluate.dataset_uuid} 的数据集")
-                dataset_detail = DatasetDetail.query.filter_by(dataset_uuid=evaluate.dataset_uuid).first()
-                if not dataset_detail:
-                    raise ValueError(f"未找到数据集 {dataset.category} 的详细信息")
-            
+            # # 检查任务状态
+            # if evaluate.evaluate_status == EvaluateStatusType.IN_PROGRESS.value:
+            #     raise ValueError("任务正在进行中，无法重复启动")
+            #
+            # # 检查模型
+            # if not evaluate.model_uuid:
+            #     raise ValueError("未指定关联的模型")
+            # model = ModelInfo.query.get(evaluate.model_uuid)
+            # if not model:
+            #     raise ValueError(f"未找到UUID为 {evaluate.model_uuid} 的模型")
+            # model_detail = ModelDetail.query.filter_by(model_uuid=evaluate.model_uuid).first()
+            # if not model_detail:
+            #     raise ValueError(f"未找到模型 {model.name} 的详细信息")
+            #
+            # # 检查数据集（如果指定了）
+            # if evaluate.dataset_uuid:
+            #     dataset = DatasetInfo.query.get(evaluate.dataset_uuid)
+            #     if not dataset:
+            #         raise ValueError(f"未找到UUID为 {evaluate.dataset_uuid} 的数据集")
+            #     dataset_detail = DatasetDetail.query.filter_by(dataset_uuid=evaluate.dataset_uuid).first()
+            #     if not dataset_detail:
+            #         raise ValueError(f"未找到数据集 {dataset.category} 的详细信息")
+            #
             # 清空输出目录
             output_dir = os.path.join(
                 current_app.config['STORAGE_FOLDER'],
@@ -415,14 +415,16 @@ class EvaluateService:
             # 1. 工作目录
             work_dir = os.path.dirname(os.path.join(
                 current_app.config['STORAGE_FOLDER'],
-                model_detail.code_file_path
+                # model_detail.code_file_path
             ))
+            print(work_dir)
             
             # 2. 环境变量
             env = os.environ.copy()
             env_path = os.path.join(
                 current_app.config['STORAGE_FOLDER'],
-                model_detail.env_file_path,
+                # model_detail.env_file_path,
+                'model_swin'
                 'Library',
                 'bin'
             )
@@ -431,14 +433,18 @@ class EvaluateService:
             # 3. Python解释器路径
             python_exe = os.path.join(
                 current_app.config['STORAGE_FOLDER'],
-                model_detail.env_file_path,
+                # model_detail.env_file_path,
+                current_app.config['MODEL_PYTHON_ENV_FOLDER'],
+                'model_swin',
                 'python.exe'
             )
             
             # 4. 脚本路径
             script_path = os.path.join(
                 current_app.config['STORAGE_FOLDER'],
-                model_detail.code_file_path
+                current_app.config['MODEL_CODE_FOLDER'],
+                # model_detail.code_file_path
+                'main.py'
             )
             
             # 5. 输入目录
@@ -446,10 +452,13 @@ class EvaluateService:
             if evaluate.dataset_uuid and evaluate.evaluate_type != 4:
                 input_dir = os.path.join(
                     current_app.config['STORAGE_FOLDER'],
-                    dataset_detail.input_path
+                    # dataset_detail.input_path
                 )
+                # 确保输入目录存在
+                if not os.path.exists(input_dir):
+                    raise ValueError(f"输入目录不存在: {input_dir}")
             
-            # 6. 输出目录
+            # 5. 输出目录
             output_dir = os.path.join(
                 current_app.config['STORAGE_FOLDER'],
                 current_app.config['EVALUATE_FOLDER'],
@@ -459,15 +468,37 @@ class EvaluateService:
             
             # 构建命令
             cmd = [python_exe, script_path]
+            
+            # main.py 期望的参数顺序：input_path output_path
             if input_dir:
                 cmd.append(input_dir)
             cmd.append(output_dir)
+            
+            # 额外参数放在最后
             if evaluate.extra_parameter:
-                cmd.append(evaluate.extra_parameter)
+                # 如果额外参数包含空格，需要正确分割
+                extra_params = evaluate.extra_parameter.strip()
+                if extra_params:
+                    # 简单的参数分割，支持引号包围的参数
+                    import shlex
+                    try:
+                        cmd.extend(shlex.split(extra_params))
+                    except ValueError:
+                        # 如果分割失败，直接添加
+                        cmd.append(extra_params)
             
             # 更新任务状态
             evaluate.evaluate_status = EvaluateStatusType.IN_PROGRESS.value
             db.session.commit()
+            
+            # 记录详细的启动信息
+            current_app.logger.info(f"启动验证任务 {evaluate.uuid}")
+            current_app.logger.info(f"Python解释器: {python_exe}")
+            current_app.logger.info(f"脚本路径: {script_path}")
+            current_app.logger.info(f"工作目录: {work_dir}")
+            current_app.logger.info(f"输入目录: {input_dir}")
+            current_app.logger.info(f"输出目录: {output_dir}")
+            current_app.logger.info(f"完整命令: {' '.join(cmd)}")
             
             # 启动进程
             process_manager = ProcessManager()
@@ -476,7 +507,10 @@ class EvaluateService:
                     'process_id': evaluate.uuid,
                     'message': '验证任务已启动',
                     'running_count': process_manager.get_running_process_count(),
-                    'max_processes': process_manager.get_max_processes()
+                    'max_processes': process_manager.get_max_processes(),
+                    'command': ' '.join(cmd),
+                    'work_dir': work_dir,
+                    'python_exe': python_exe
                 }
             else:
                 # 如果启动失败，恢复任务状态
