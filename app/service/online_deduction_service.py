@@ -88,13 +88,6 @@ def generate_tx_rx_pairs_csv(point_config: Dict[str, Any], task_uuid: str) -> Tu
         # 写入CSV文件
         with open(csv_file_path, 'w', newline='', encoding='utf-8') as csvfile:
             csv_writer = csv.writer(csvfile)
-            
-            # 写入标题行
-            csv_writer.writerow([
-                '接收机纬度', '接收机经度', '接收机高度', 
-                '发射机纬度', '发射机经度', '发射机高度'
-            ])
-            
             # 生成所有发射机-接收机配对
             for tx_pos in tx_pos_list:
                 for rx_pos in rx_pos_list:

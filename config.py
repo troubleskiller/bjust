@@ -33,7 +33,7 @@ class Config:
     DATASET_INPUT_FOLDER = 'input'  # 数据集输入文件目录
     
     # 验证任务相关目录
-    EVALUATE_FOLDER = 'test/model_code'  # 验证任务资源主目录
+    EVALUATE_FOLDER = 'evaluate'  # 验证任务资源主目录
     EVALUATE_OUTPUT_FOLDER = 'output'  # 验证任务输出目录
     
     # 任务CSV文件存储目录
