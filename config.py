@@ -39,6 +39,12 @@ class Config:
     # 任务CSV文件存储目录
     TASK_CSV_DIR = os.path.join(STORAGE_FOLDER, 'tasks', 'csv')  # 任务CSV文件存储目录
     
+    # 典型场景CSV文件存储目录
+    TYPICAL_SCENARIO_CSV_DIR = os.path.join(STORAGE_FOLDER, 'typical_scenarios')  # 典型场景CSV文件存储目录
+    
+    # 在线推演任务相关配置
+    TASK_OUTPUT_DIR = os.path.join(STORAGE_FOLDER, 'tasks')
+    
     # 模型存储基础路径配置
     MODEL_STORAGE_BASE_PATH = STORAGE_FOLDER  # 模型文件存储基础路径
     

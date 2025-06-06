@@ -19,6 +19,7 @@ from app.route.channel_dataset_route import channel_dataset_bp
 from app.route.model_validation_route import model_validation_bp
 from app.route.dataset_route import dataset_bp
 from app.route.model_route import model_bp
+from app.route.typical_scenario_route import typical_scenario_bp
 
 def create_app():
     """
@@ -47,6 +48,7 @@ def create_app():
     app.register_blueprint(model_plaza_bp)
     app.register_blueprint(channel_dataset_bp)
     app.register_blueprint(model_validation_bp)
+    app.register_blueprint(typical_scenario_bp)
     
     # 创建数据库表
     # with app.app_context():

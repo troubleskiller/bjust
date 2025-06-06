@@ -117,4 +117,187 @@ POST /api/v1/online_deduction/tasks
 4. 配置文件存储路径
 5. 启动Flask应用
 
-所有接口都已按照技术文档的要求实现，支持完整的CRUD操作和业务逻辑。 
+所有接口都已按照技术文档的要求实现，支持完整的CRUD操作和业务逻辑。
+
+## 在线推演预测任务API
+
+### 创建预测任务 API
+
+**端点**: `POST /api/v1/online_deduction/tasks`
+
+**功能**: 创建新的在线推演预测任务，支持三种场景选择方式
+
+#### 三种场景类型
+
+1. **自主选点 (manual_selection)**
+   - 用户手动指定发射机和接收机位置
+   - 需要提供 `scenario_description`（场景描述字符串）
+   - 示例: "北京朝阳区商业中心区域的信号覆盖预测分析"
+
+2. **典型场景 (typical_scenario)**  
+   - 使用预设的典型场景配置
+   - **需要提供 `scenario_uuid`（典型场景UUID）**
+   - 通过典型场景管理系统添加的场景具有唯一UUID
+   - 系统会自动从对应的典型场景目录加载 input.csv 文件
+
+3. **自定义上传 (custom_upload)**
+   - 用户上传自定义的场景配置
+   - 需要提供 `scenario_description`（场景描述字符串）
+   - 示例: "工业园区特殊环境下的信号传播预测"
+
+#### 关键修改
+
+**典型场景参数更改:**
+- 旧版本: 使用 `scenario_name`（场景名称字符串）
+- 新版本: 使用 `scenario_uuid`（典型场景UUID）
+
+这个修改允许：
+- 精确定位典型场景，避免重名问题
+- 支持动态添加的典型场景
+- 与典型场景管理系统集成
+- 提供更好的场景追踪和管理
+
+#### 请求示例
+
+##### 自主选点场景
+```json
+{
+  "task_name": "北京市朝阳区信号覆盖预测",
+  "task_type": "single_point_prediction",
+  "scenario_type": "manual_selection",
+  "point_config": {
+    "scenario_description": "北京朝阳区商业中心区域的信号覆盖预测分析",
+    "tx_pos_list": [
+      {"lat": 39.9200, "lon": 116.4200, "height": 30.0}
+    ],
+    "rx_pos_list": [
+      {"lat": 39.9195, "lon": 116.4195, "height": 1.5}
+    ],
+    "area_bounds": {
+      "min_lat": 39.9100,
+      "min_lon": 116.4100,
+      "max_lat": 39.9300,
+      "max_lon": 116.4300
+    },
+    "resolution_m": 50.0
+  },
+  "tif_image_name": "nanjing",
+  "model_params": {
+    "frequency": 1800,
+    "power": 40,
+    "antenna_height": 30
+  }
+}
+```
+
+##### 典型场景（使用UUID）
+```json
+{
+  "task_name": "典型场景_城市商业区预测",
+  "task_type": "single_point_prediction", 
+  "scenario_type": "typical_scenario",
+  "point_config": {
+    "scenario_uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  },
+  "tif_image_name": "nanjing",
+  "model_params": {
+    "frequency": 1800,
+    "power": 40,
+    "antenna_height": 30
+  }
+}
+```
+
+##### 自定义上传场景
+```json
+{
+  "task_name": "自定义场景_工业园区预测",
+  "task_type": "single_point_prediction",
+  "scenario_type": "custom_upload", 
+  "point_config": {
+    "scenario_description": "工业园区特殊环境下的信号传播预测"
+  },
+  "tif_image_name": "nanjing",
+  "model_params": {
+    "frequency": 1800,
+    "power": 40,
+    "antenna_height": 30
+  }
+}
+```
+
+#### 响应格式
+
+成功响应 (200):
+```json
+{
+  "message": "success",
+  "code": "200",
+  "data": {
+    "task_uuid": "generated-task-uuid",
+    "task_name": "任务名称",
+    "task_type": "single_point_prediction",
+    "scenario_type": "typical_scenario",
+    "status": "pending",
+    "created_at": "2024-01-01T12:00:00Z",
+    "scenario_csv_content": "39.9200,116.4200,30.0,39.9195,116.4195,1.5\n39.9200,116.4200,30.0,39.9205,116.4205,1.5\n...",
+    "scenario_info": {
+      "scenario_name": "城市商业区",
+      "prediction_type": "单点预测",
+      "tif_image_name": "nanjing",
+      "created_at": "2024-01-01T12:00:00"
+    }
+  }
+}
+```
+
+**典型场景特殊返回字段:**
+- `scenario_csv_content`: 该典型场景的 input.csv 文件的完整字符串内容
+- `scenario_info`: 典型场景的元信息，包含场景名称、预测类型、TIF图像名称等
+
+#### 错误处理
+
+1. **缺少必填参数**
+   - 状态码: 400
+   - 消息: "scenario_uuid is required for typical_scenario mode"
+
+2. **典型场景不存在**
+   - 状态码: 400  
+   - 消息: "Typical scenario with UUID 'xxx' not found"
+
+3. **CSV文件缺失**
+   - 状态码: 400
+   - 消息: "Input CSV file not found for scenario 'xxx'"
+
+#### 服务层实现
+
+**新增函数**: `load_typical_scenario_by_uuid(scenario_uuid)`
+- 通过UUID在典型场景目录中查找匹配的场景
+- 读取场景的 `scenario_metadata.json` 元数据文件
+- 加载 `input.csv` 文件并解析为点位配置
+- **读取 `input.csv` 文件的完整内容作为字符串**
+- 返回标准化的点位配置格式（包含CSV字符串内容）
+
+**修改函数**: `create_prediction_task_service()`
+- 更新典型场景处理逻辑，使用 `scenario_uuid` 替代 `scenario_name`
+- 调用新的UUID加载函数
+- **当为典型场景时，在返回结果中包含CSV文件内容和场景元信息**
+- 保留其他场景类型的原有逻辑
+
+#### 与典型场景管理系统集成
+
+该API现在完全集成了典型场景管理系统：
+- 使用典型场景管理系统的UUID标识符
+- 自动从典型场景目录结构中加载配置
+- 支持元数据信息（预测类型、创建时间等）
+- 提供完整的场景追踪和管理能力
+
+#### 测试支持
+
+更新了测试脚本 `test_scenario_api.py`:
+- 自动获取可用的典型场景UUID
+- 测试所有三种场景类型
+- 验证典型场景UUID的正确使用
+- 提供完整的API功能测试覆盖
+
+这个实现为在线推演任务提供了灵活而强大的场景选择功能，同时保持了与典型场景管理系统的完全集成。 
